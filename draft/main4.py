@@ -107,6 +107,7 @@ def fine_tune(training_data, sentiment_target, num_epochs, lr, batch_size, num_t
 
                 generated_sentences=[]
                 for seq in new_tokens:
+                    seq[seq < 0] = tokenizer.unk_token_id
                     seq[seq >= tokenizer.vocab_size] = tokenizer.unk_token_id
                     generated_sentences.append(tokenizer.decode(seq.tolist(), skip_special_tokens=True))
                 #for tokens in generated_sentences:
