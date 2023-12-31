@@ -153,7 +153,7 @@ for epoch, batch in tqdm(zip(range(total_ppo_epochs), iter(dataloader))):
     #### Run PPO step 
     t = time.time()
     #print(type(query_tensors), type(response_tensors), type(rewards) , type(rewards.tolist()) )
-    #print(rewards)
+    print(rewards)
     #print(rewards.tolist())
     testing = [ torch.tensor(v, requires_grad=True) for v in rewards.clone().detach().requires_grad_(True) ]
     stats = ppo_trainer.step(query_tensors, response_tensors, testing)
