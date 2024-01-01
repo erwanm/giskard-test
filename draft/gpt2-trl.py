@@ -53,6 +53,15 @@ gen_kwargs = {
 
 
 
+def softmax(x):
+    return(np.exp(x)/np.exp(x).sum())
+
+def format_sentiment_single(sentiment):
+    labels = ([ el["label"] for el in sentiment ])
+    weights = softmax(np.array([ el["score"] for el in sentiment ]))
+    return {labels[i]: weights[i] for i in range(len(labels))}
+
+
 def format_sentiment_single(sentiment):
     return {el["label"]: el["score"] for el in sentiment}
 
@@ -83,7 +92,7 @@ def custom_rewards(sentiment_pipe, generated_sentences, target_sentiment):
 
 
 
-def generate_some_sentences(model, tokenizer, prompt, n, max_length=15, temperature=0.95, topk=200):
+def generate_some_sentences(model, tokenizer, prompt, n, max_length=15, temperature=0.95, topk=50, min_len=40, max_len=60):
 
     print(f"Generating {n} sentences... ")
     # Tokenize input prompt
@@ -100,7 +109,8 @@ def generate_some_sentences(model, tokenizer, prompt, n, max_length=15, temperat
             new_part =output[0, input_ids.shape[-1]:]
             if len(new_part) > 0 and new_part[0] != tokenizer.eos_token_id:
                 generated_text = tokenizer.decode(new_part, skip_special_tokens=True)
-                nonempty_sent = True
+                if len(generated_text)>=min_len and len(generated_text)<=max_len:
+                    nonempty_sent = True
         generated_sentences.append({'query': generated_text, 'tokens': new_part.tolist()})
     print()
     #for i,s in enumerate(generated_sentences):
@@ -123,8 +133,8 @@ class MyDataset(torch.utils.data.Dataset):
 def collator(data):
     return dict((key, [d[key] for d in data]) for key in data[0])
 
-def init_dataset(input_string, n=4096):
-    return MyDataset(generate_some_sentences(gpt2_model, gpt2_tokenizer, input_string, n))
+def init_dataset(input_string, n, max_length):
+    return MyDataset(generate_some_sentences(gpt2_model, gpt2_tokenizer, input_string, n, max_length=max_length))
 
 
 def find_close_sentiment(sentiment_mode_str="lxyuan/distilbert-base-multilingual-cased-sentiments-student",
@@ -132,7 +142,7 @@ def find_close_sentiment(sentiment_mode_str="lxyuan/distilbert-base-multilingual
                          epsilon=.01,
                          max_epochs=1000,
                          sample_size=256,
-                         max_gen_sent_len=15):
+                         max_gen_sent_len=12):
 
     # Init sentiment analysis pipeline
     sentiment_pipe = pipeline("sentiment-analysis",sentiment_mode_str, device=pipe_device, top_k=None)
@@ -140,9 +150,8 @@ def find_close_sentiment(sentiment_mode_str="lxyuan/distilbert-base-multilingual
     # Apply to input sentences
     target_sentiment0 = apply_sentiment_model(sentiment_pipe, [input_string])
     target_sentiment = target_sentiment0[0]
-    print(target_sentiment)
 
-    ds = init_dataset(input_string, sample_size)
+    ds = init_dataset(input_string, sample_size, max_gen_sent_len)
     dataloader = torch.utils.data.DataLoader(ds, batch_size=ppo_config['batch_size'], collate_fn=collator)
 
     my_ppo_config = PPOConfig(**ppo_config)
@@ -165,9 +174,9 @@ def find_close_sentiment(sentiment_mode_str="lxyuan/distilbert-base-multilingual
             # the highest abs diff is used to check that all the scores are close to the target sentiment, since
             # if the highest abs diff is
             idx_closest_sentiment = np.argmin(max_diff_list)
+            result_sentence = batch['response'][idx_closest_sentiment]
+            result_sentiment = apply_sentiment_model(sentiment_pipe, [result_sentence])
             if max_diff_list[idx_closest_sentiment] <= epsilon:
-                result_sentence = batch['response'][idx_closest_sentiment]
-                result_sentiment = apply_sentiment_model(sentiment_pipe, [result_sentence])
                 return (result_sentence, result_sentiment)
             rewards = torch.tensor(rewards_list).to(device)
     
@@ -177,6 +186,9 @@ def find_close_sentiment(sentiment_mode_str="lxyuan/distilbert-base-multilingual
      
             #### Log everything
             print(f"***** EPOCH {epoch}, batch {batch_id}: MEAN = {torch.mean(rewards).cpu().numpy()}, CLOSEST HIGHEST DIFF = {max_diff_list[idx_closest_sentiment]}")
+            print(f"   Target sentiment: {target_sentiment}")
+            print(f"   Current closest sentiment: {result_sentiment}")
+            print(f"                for sentence: '{result_sentence}'")
 
 
 
