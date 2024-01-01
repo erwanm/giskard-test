@@ -8,6 +8,8 @@ from trl import AutoModelForCausalLMWithValueHead
 from trl import PPOTrainer, PPOConfig
 from trl import core
 
+from Levenshtein import distance
+
 model_name = "lvwerra/gpt2-imdb"
 
 ppo_config = {
@@ -86,8 +88,19 @@ def custom_rewards(sentiment_pipe, generated_sentences, target_sentiment):
 
 
 
+def validate_generated_sentence(tokenizer, new_part, min_levenshtein_string=None, min_len=40, max_len=60):
+    if len(new_part) > 0 and new_part[0] != tokenizer.eos_token_id:
+        generated_text = tokenizer.decode(new_part, skip_special_tokens=True)
+        if len(generated_text)>=min_len and len(generated_text)<=max_len:
+            if min_levenshtein_string is None:
+                return generated_text
+            else:
+                if distance(min_levenshtein_string, generated_text)>=30:
+                    return generated_text
+    return None
 
-def generate_some_sentences(model, tokenizer, prompt, n, max_length=15, temperature=0.95, topk=50, min_len=40, max_len=60):
+
+def generate_some_sentences(model, tokenizer, prompt, n, max_length=15, temperature=0.95, topk=50):
 
     print(f"Generating {n} sentences... ")
     # Tokenize input prompt
@@ -98,14 +111,12 @@ def generate_some_sentences(model, tokenizer, prompt, n, max_length=15, temperat
     generated_sentences = []
     for sample in range(n):
         print(f"\r {sample}/{n} ",end='')
-        nonempty_sent = False
-        while not nonempty_sent:
+        generated_text = None
+        while generated_text is None:
             output = model.generate(input_ids, max_length=input_length+max_length, num_return_sequences=1, do_sample=True, temperature=temperature, top_k=topk, pad_token_id=tokenizer.eos_token_id)
-            new_part =output[0, input_ids.shape[-1]:]
-            if len(new_part) > 0 and new_part[0] != tokenizer.eos_token_id:
-                generated_text = tokenizer.decode(new_part, skip_special_tokens=True)
-                if len(generated_text)>=min_len and len(generated_text)<=max_len:
-                    nonempty_sent = True
+            new_part =output[0, input_length:]
+            generated_text = validate_generated_sentence(tokenizer, new_part)
+        #print(generated_text)
         generated_sentences.append({'query': generated_text, 'tokens': new_part.tolist()})
     print()
     #for i,s in enumerate(generated_sentences):
@@ -159,11 +170,16 @@ def find_close_sentiment(sentiment_mode_str="lxyuan/distilbert-base-multilingual
             text_queries = batch["query"]
             #### Get response from gpt2
             response_tensors = []
+            batch['response'] = []
             for i in range(len(query_tensors)):
                 query_len = len(query_tensors[i])
-                response = gpt2_model.generate(query_tensors[i].unsqueeze(dim=0), max_new_tokens=max_gen_sent_len, **gen_kwargs)
-                response_tensors.append(response.squeeze()[-query_len:])
-                batch['response'] = [gpt2_tokenizer.decode(r.squeeze()) for r in response_tensors]
+                generated_text = None
+                while generated_text is None:
+                    response = gpt2_model.generate(query_tensors[i].unsqueeze(dim=0), max_new_tokens=max_gen_sent_len, **gen_kwargs)
+                    generated_text = validate_generated_sentence(gpt2_tokenizer, response.squeeze()[query_len:], input_string)
+                #print(generated_text)
+                response_tensors.append(response.squeeze()[query_len:])
+                batch['response'].append(generated_text)
 
             #### Compute sentiment score
             rewards_list, max_diff_list = custom_rewards(sentiment_pipe, batch['response'], target_sentiment)
@@ -195,5 +211,9 @@ if __name__ == '__main__':
         print("Failure :(")
     else:
         print("Success :)")
+        print(f"   Target sentiment: {target_sentiment}")
+        print(f"                for sentence: '{input_string}'")
+        print(f"   Current closest sentiment: {result_sentiment}")
+        print(f"                for sentence: '{result_sentence}'")
 
 
