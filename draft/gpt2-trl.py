@@ -61,7 +61,6 @@ def format_sentiment_single(sentiment):
     weights = softmax(np.array([ el["score"] for el in sentiment ]))
     return {labels[i]: weights[i] for i in range(len(labels))}
 
-
 def apply_sentiment_model(sentiment_pipe, sentences):
     sentiments = sentiment_pipe(sentences, **sent_kwargs)
     return [ format_sentiment_single(datum) for datum in sentiments ]
@@ -135,10 +134,11 @@ def init_dataset(input_string, n, max_length):
 
 def find_close_sentiment(sentiment_mode_str="lxyuan/distilbert-base-multilingual-cased-sentiments-student",
                          input_string = 'This was an absolutely incredibly horrible story.',
-                         epsilon=.001,
+                         epsilon=.0001,
                          max_epochs=1000,
-                         sample_size=256,
-                         max_gen_sent_len=12):
+                         sample_size=2048,
+                         max_gen_sent_len=12,
+                         verbose = False):
 
     # Init sentiment analysis pipeline
     sentiment_pipe = pipeline("sentiment-analysis",sentiment_mode_str, device=pipe_device, top_k=None)
@@ -172,10 +172,11 @@ def find_close_sentiment(sentiment_mode_str="lxyuan/distilbert-base-multilingual
             idx_closest_sentiment = np.argmin(max_diff_list)
             result_sentence = batch['response'][idx_closest_sentiment]
             result_sentiment = apply_sentiment_model(sentiment_pipe, [result_sentence])
-            print(f"   Target sentiment: {target_sentiment}")
-            print(f"                for sentence: '{input_string}'")
-            print(f"   Current closest sentiment: {result_sentiment}")
-            print(f"                for sentence: '{result_sentence}'")
+            if verbose:
+                print(f"   Target sentiment: {target_sentiment}")
+                print(f"                for sentence: '{input_string}'")
+                print(f"   Current closest sentiment: {result_sentiment}")
+                print(f"                for sentence: '{result_sentence}'")
             if max_diff_list[idx_closest_sentiment] <= epsilon:
                 return (result_sentence, result_sentiment)
             rewards = torch.tensor(rewards_list).to(device)
@@ -185,8 +186,7 @@ def find_close_sentiment(sentiment_mode_str="lxyuan/distilbert-base-multilingual
             stats = ppo_trainer.step(query_tensors, response_tensors, testing)
      
             #### Log everything
-            print(f"***** EPOCH {epoch}, batch {batch_id}: MEAN = {torch.mean(rewards).cpu().numpy()}, CLOSEST HIGHEST DIFF = {max_diff_list[idx_closest_sentiment]}")
-
+            print(f"\n***** EPOCH {epoch}, batch {batch_id}: MEAN = {torch.mean(rewards).cpu().numpy()}, CLOSEST HIGHEST DIFF = {max_diff_list[idx_closest_sentiment]}\n")
 
 
 if __name__ == '__main__':
