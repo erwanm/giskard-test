@@ -96,7 +96,6 @@ def generate_some_sentences(model, tokenizer, prompt, n, max_length=15, temperat
         print(f"\r {sample}/{n} ",end='')
         nonempty_sent = False
         while not nonempty_sent:
-            output = model.generate(input_ids, max_length=max_length, num_return_sequences=1, do_sample=True, temperature=temperature, top_k=topk, pad_token_id=tokenizer.eos_token_id)
             output = model.generate(input_ids, max_length=input_length+max_length, num_return_sequences=1, do_sample=True, temperature=temperature, top_k=topk, pad_token_id=tokenizer.eos_token_id)
             new_part =output[0, input_ids.shape[-1]:]
             if len(new_part) > 0 and new_part[0] != tokenizer.eos_token_id:
