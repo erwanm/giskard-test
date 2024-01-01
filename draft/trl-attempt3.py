@@ -28,14 +28,14 @@ config = {
    "model_name": "lvwerra/gpt2-imdb",
  #   "cls_model_name": "lvwerra/distilbert-imdb",
      "steps": 20000,
-    "batch_size": 32,
+    "batch_size": 128,
     "mini_batch_size": 16,
     "ppo_epochs": 200,   
     "txt_in_min_len": 2,
     "txt_in_max_len": 8,
     "txt_out_min_len": 4,
     "txt_out_max_len": 16,
-    "lr": 1.41e-5,
+    "lr": 1e-4,
     "init_kl_coef":0.2,
     "target": 6,
     "horizon":10000,
@@ -49,7 +49,7 @@ config = {
 ppoconfig = {
     "model_name": "attempt",
     "steps": 20000,
-    "batch_size": 32,
+    "batch_size": 128,
     "mini_batch_size": 16,
     "ppo_epochs": 200,   
     "init_kl_coef":0.2,
@@ -115,13 +115,13 @@ gpt2_model.to(device)
 gpt2_model_ref.to(device)
 
 
-
  
 def generate_some_sentences(model, tokenizer, prompt, n, max_length=35, temperature=0.95, topk=200):
 
     print(f"Generating {n} sentences... ")
     # Tokenize input prompt
     input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+    input_length = len(input_ids[0])
 
     # Generate text
     generated_sentences = []
@@ -129,7 +129,7 @@ def generate_some_sentences(model, tokenizer, prompt, n, max_length=35, temperat
         print(f"\r {sample}/{n} ",end='')
         nonempty_sent = False
         while not nonempty_sent:
-            output = model.generate(input_ids, max_length=max_length, num_return_sequences=1, do_sample=True, temperature=temperature, top_k=topk, pad_token_id=tokenizer.eos_token_id)
+            output = model.generate(input_ids, max_length=input_length+max_length, num_return_sequences=1, do_sample=True, temperature=temperature, top_k=topk, pad_token_id=tokenizer.eos_token_id)
             new_part =output[0, input_ids.shape[-1]:]
             if len(new_part) > 0 and new_part[0] != tokenizer.eos_token_id:
                 generated_text = tokenizer.decode(output[0, input_ids.shape[-1]:], skip_special_tokens=True)
@@ -186,7 +186,7 @@ target_sentiment0 = apply_sentiment_model([input_string])
 target_sentiment = target_sentiment0[0]
 print("Target sentiment: ", target_sentiment)
 
-sample = generate_some_sentences(gpt2_model, gpt2_tokenizer, input_string, 256)
+sample = generate_some_sentences(gpt2_model, gpt2_tokenizer, input_string, 1024)
 mydataset = MyDataset([tokenize(s) for s in sample])
 dataloader = torch.utils.data.DataLoader(mydataset, batch_size=config['batch_size'], collate_fn=collator)
 
