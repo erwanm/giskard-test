@@ -62,10 +62,6 @@ def format_sentiment_single(sentiment):
     return {labels[i]: weights[i] for i in range(len(labels))}
 
 
-def format_sentiment_single(sentiment):
-    return {el["label"]: el["score"] for el in sentiment}
-
-
 def apply_sentiment_model(sentiment_pipe, sentences):
     sentiments = sentiment_pipe(sentences, **sent_kwargs)
     return [ format_sentiment_single(datum) for datum in sentiments ]
