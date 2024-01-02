@@ -1,6 +1,6 @@
 # Brief review of “Chainpoll: A high efficacy method for LLM hallucination detection” by Friel and Sanyal
 
-Caution: the author of this review is not familiar with the state of the art of hallucination detection, which is the topic of the present paper. This means that I cannot assess the completeness of the bibliography presented in the paper. Nevertheless understanding the paper does not require a strong background, so I can confidently review the paper on all other aspects.
+*Caution: the author of this review is not familiar with the state of the art of hallucination detection, which is the topic of the present paper. This means that I cannot assess the completeness of the bibliography presented in the paper. Nevertheless understanding the paper does not require a strong background, so I can confidently review the paper on all other aspects.*
 
 In this paper the authors address the problem of detecting hallucinations produced by LLMs. Hallucinations are clearly an important issue  for LLMs and detecting them reliably would be a huge step, since this would make the answers produced by a LLM much more trustable and therefore usable without supervision in a much broader range of applications. The authors propose two contributions: a new benchmark dataset for hallucation detection called RealHall, and a new method for the same called ChainPoll. The later is evaluated on the former and outperforms rival systems for this task.
 
@@ -8,13 +8,13 @@ The paper is clear and well written. In particular the way the problem is framed
 
 It is worth noting that the benchmark dataset RealHall is presented as carefully curated, more realistic and challenging than previous datasets. This is important since the claim of the authors that their method ChainPoll outperforms other methods relies on the validity of their dataset. Unfortunately the data annotation method is very questionable. First, this part is presented only in the appendix (A3) despite its crucial relevance, since the whole contribution relies on it. It contains no quantifiable or objective information of any form. The authors simply "found that GPT-4 performed extremely well as an annotator, in the sense that it agreed very closely with the judgments of our human annotators. In fact, GPT-4 disagreed with our human annotators no more often than the human annotators disagreed with one another." These claims should at least be supported by some evidence, like the inter-annotator agreement. The authors give no indication as to why this crucial choice was made in the dataset which supports all their contribution, this is rather problematic. In fact, this issue raises the question of why their dataset and main method should be trusted: essentially their ChainPoll method consists in asking ChatGPT the answer, and this answer is assessed against a benchmark dataset RealHall which was also made by asking ChatGPT the answer. To caricature, this is equivalent to asking a suspected liar whether they said the truth. Thus the superior performance of the ChainPoll method is tainted, because it might be due to the fact that it follows how the "gold standard" was obtained.
 
-Minor remarks:
+## Minor remarks:
 
 - pseudo-entropy: I cannot assess how sound this is, but it seems either too important for being considered a small detail (i.e. it would be worth a full paper by itself, with thorough experiments to validate the measure), or there must have been previous attempts at this kind of measure.
 - chain of thought example p 7-8: it would be worth explaining whether the explanation is correct, in particular the details related to what the document or documents contain or not. The authors claim that the CoT reasoning provided by the LM evidences its answer, but for this it would be interesting to know how often the LM actually halllucinates in the explanation.
 - "When necessary, we wrote simple prompt formats (e.g. 'Answer the question, using the documents. {question} {documents}') to communicate the task to the model" -> When is this necessary?
 
-Typos:
+### Typos:
 
 - p. 5 Acronym RAG used before being defined 
 - p 5 "we and retrieve"
