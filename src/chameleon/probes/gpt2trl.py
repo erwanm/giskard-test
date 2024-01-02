@@ -10,7 +10,7 @@ from trl import core
 
 from Levenshtein import distance
 
-from chameleon.probes import BaseProbe
+from .base import BaseProbe, ProbeResult
 from chameleon.models import HuggingFaceModel
 
 
@@ -28,7 +28,7 @@ default_ppo_config = {
     "ppo_epochs": 4,   
     "init_kl_coef":0.2,
     "target": 6,
-    "horizon":10000,
+    "horizon":100,
     "gamma":1,
     "lam":0.95,
     "cliprange": .2,
@@ -71,8 +71,6 @@ class MyDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return self.aslist[idx]
 
-def softmax(x):
-    return (np.exp(x)/np.exp(x).sum())
 
 def collator(data):
     return dict((key, [d[key] for d in data]) for key in data[0])
@@ -108,21 +106,15 @@ class Gpt2TrlProbe(BaseProbe):
         if kwargs.get('sample_size') is not None:
             self.sample_size = kwargs.get('sample_size')
         self.ppo_config = default_ppo_config
-        for name, value in ppo_config.items():
+        for name, value in self.ppo_config.items():
             if kwargs.get(name) is not None:
                 self.ppo_config[name] = kwargs.get(name)
-        return TODO
+        return self.find_close_sentiment()
 
 
-
-    # apply the sentiment model to a list of sentences and normalize the output scores (softmax)
+    # apply the sentiment model to a list of sentences
     def apply_sentiment_model(self, sentences):
-        multi_sentiment = []
-        for sentence in sentences:
-            senti = self.model.predict(sentence)
-            probs = softmax(np.array([ senti[el] for el in sorted(senti.keys()) ]))
-            multi_sentiment.append({el: probs[i] for i,el in enumerate(sorted(senti.keys())) })
-        return multi_sentiment
+        return [ self.model.predict(sentence) for sentence in sentences ]
 
 
     # returns a pair of lists (rewards, max_diff): for each sentence, the reward and the highest abs diff.
@@ -185,13 +177,12 @@ class Gpt2TrlProbe(BaseProbe):
         return generated_sentences
 
 
-    def find_close_sentiment(self, max_epochs=1000, max_gen_sent_len=12, verbose = False):
+    def find_close_sentiment(self, max_epochs=9999, max_gen_sent_len=12, verbose = False):
 
         # Apply to input sentences
-        target_sentiment0 = self.apply_sentiment_model([self.target])
-        target_sentiment = target_sentiment0[0]
+        target_sentiment = self.apply_sentiment_model([self.target])[0]
 
-        ds = MyDataset(generate_some_sentences(gpt2_model, gpt2_tokenizer, input_string, self.sample_size, max_length=max_gen_sent_len))
+        ds = MyDataset(self.generate_some_sentences(gpt2_model, gpt2_tokenizer, self.target, self.sample_size, max_length=max_gen_sent_len))
         dataloader = torch.utils.data.DataLoader(ds, batch_size=self.ppo_config['batch_size'], collate_fn=collator)
 
         my_ppo_config = PPOConfig(**self.ppo_config)
@@ -208,15 +199,15 @@ class Gpt2TrlProbe(BaseProbe):
                     generated_text = None
                     while generated_text is None:
                         response = gpt2_model.generate(query_tensors[i].unsqueeze(dim=0), max_new_tokens=max_gen_sent_len, **gen_kwargs)
-                        generated_text = self.validate_generated_sentence(gpt2_tokenizer, response.squeeze()[query_len:], input_string)
+                        generated_text = self.validate_generated_sentence(gpt2_tokenizer, response.squeeze()[query_len:], self.target)
                     response_tensors.append(response.squeeze()[query_len:])
                     batch['response'].append(generated_text)
 
                 #### Compute sentiment score
-                rewards_list, max_diff_list = self.custom_rewards(sentiment_pipe, batch['response'], target_sentiment)
+                rewards_list, max_diff_list = self.custom_rewards(batch['response'], target_sentiment)
                 idx_closest_sentiment = np.argmin(max_diff_list)
                 result_sentence = batch['response'][idx_closest_sentiment]
-                result_sentiment = apply_sentiment_model(sentiment_pipe, [result_sentence])
+                result_sentiment = self.apply_sentiment_model([result_sentence])[0]
                 if verbose:
                     print(f"   Target sentiment: {target_sentiment}")
                     print(f"                for sentence: '{input_string}'")
@@ -225,10 +216,7 @@ class Gpt2TrlProbe(BaseProbe):
                 # the highest abs diff is used to check that all the scores are close to the target sentiment, since
                 # if the highest abs diff is lower than epsilon then we're good.
                 if max_diff_list[idx_closest_sentiment] <= self.epsilon:
-                    result = ProbeResult()
-                    result.sentence = result_sentence
-                    result.scores = result_sentiment
-                    return result
+                    return ProbeResult(result_sentence, result_sentiment)
                 rewards = torch.tensor(rewards_list).to(device)
                 #### Run PPO step 
                 reshaped_rewards = [ torch.tensor(v, requires_grad=True) for v in rewards.clone().detach().requires_grad_(True) ]
