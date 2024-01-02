@@ -206,13 +206,11 @@ def find_close_sentiment(sentiment_mode_str="lxyuan/distilbert-base-multilingual
 
 
 if __name__ == '__main__':
-    sentence, sentiment = find_close_sentiment()
+    result_sentence, result_sentiment = find_close_sentiment()
     if sentence is None:
         print("Failure :(")
     else:
         print("Success :)")
-        print(f"   Target sentiment: {target_sentiment}")
-        print(f"                for sentence: '{input_string}'")
         print(f"   Current closest sentiment: {result_sentiment}")
         print(f"                for sentence: '{result_sentence}'")
 
