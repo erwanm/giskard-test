@@ -14,6 +14,7 @@ It is worth noting that the benchmark dataset RealHall is presented as carefully
 - chain of thought example p 7-8: it would be worth explaining whether the explanation is correct, in particular the details related to what the document or documents contain or not. The authors claim that the CoT reasoning provided by the LM evidences its answer, but for this it would be interesting to know how often the LM actually halllucinates in the explanation.
 - "When necessary, we wrote simple prompt formats (e.g. 'Answer the question, using the documents. {question} {documents}') to communicate the task to the model" -> When is this necessary?
 - The "detailed and carefully engineered prompt" required for implementing ChainPoll is not provided in the paper (as far as I can tell), therefore the method is not replicable.
+- The paper did not mention any language limitation but the datasets in RealHall are only in English. Assuming that the method works well with English, it would likely not work as well with other languages.
 
 ### Typos:
 
