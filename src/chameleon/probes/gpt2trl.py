@@ -28,7 +28,7 @@ default_ppo_config = {
     "ppo_epochs": 4,   
     "init_kl_coef":0.2,
     "target": 6,
-    "horizon":100,
+    "horizon":1000,
     "gamma":1,
     "lam":0.95,
     "cliprange": .2,
